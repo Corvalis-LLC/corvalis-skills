@@ -72,14 +72,22 @@ Each subagent MUST research before forming arguments:
 | Type | Minimum | Tools |
 |------|---------|-------|
 | Codebase research | 3 searches | Glob, Grep, Read |
-| Web research | 1 search (if external knowledge needed) | WebSearch, WebFetch |
+| Web research | 2 searches minimum, always required | WebSearch, WebFetch |
 | File reads | 2 files | Read |
+
+Web research is not optional. Each reviewer must back its arguments with research into standard industry practices for similar systems or features. Prefer strong engineering sources when available:
+- large-scale engineering blogs or documentation from companies such as Google, Meta, Netflix, Stripe, Shopify, Airbnb, Uber, Vercel, Cloudflare, GitHub, and similar mature teams
+- official framework or platform documentation
+- postmortems or architecture writeups for comparable products
+
+If exact FAANG-style analogues do not exist, use the closest high-quality engineering sources and say so explicitly.
 
 ## Quality Standards
 
 - **Advocate**: Specific evidence, not optimism. Acknowledge limitations while arguing strengths.
 - **Analyst**: Genuinely neutral. Quantifiable comparisons. All major assumptions identified.
 - **Critic**: Constructive, not destructive. Mitigations for every criticism. Prioritized by severity.
+- **All reviewers**: Arguments must cite both codebase evidence and web-researched industry practice for similar features/applications.
 
 ## Integration with Plan Mode
 

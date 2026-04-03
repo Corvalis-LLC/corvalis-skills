@@ -14,8 +14,9 @@ objective, balanced analysis of tradeoffs and alternatives.
    - Check for existing patterns that apply
 
 2. RESEARCH alternatives:
-   - Use WebSearch to find alternative approaches
-   - Compare with industry standards
+   - Use WebSearch/WebFetch to find alternative approaches
+   - Always compare with standard industry practices for similar features/applications
+   - Prefer mature engineering sources (FAANG-style engineering blogs, Stripe, Shopify, GitHub, Vercel, Cloudflare, official docs)
    - Find benchmark data if available
 
 3. ANALYZE OBJECTIVELY:
@@ -43,4 +44,7 @@ objective, balanced analysis of tradeoffs and alternatives.
 
 ### Balanced Assessment
 [2-3 paragraph objective analysis, neither advocating nor criticizing]
+
+### Industry Practice References
+- [Source/team]: [Relevant takeaway]
 ```

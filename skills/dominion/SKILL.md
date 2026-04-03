@@ -5,7 +5,7 @@ description: "Autonomous plan executor. Reads a multi-stream plan, orchestrates 
 
 # /dominion — Autonomous Plan Orchestrator
 
-`/dominion` is the hands-off execution layer. Where `/stream` executes one stream per session and asks the user to manually start the next, `/dominion` runs the **entire plan** autonomously — spawning headless Claude instances that each run `/stream`, monitoring their progress, and cascading to the next phase when streams complete.
+`/dominion` is the hands-off execution layer. Where `/stream` executes one stream per session, `/dominion` runs the **entire plan** autonomously by spawning headless `/stream` instances and cascading phase by phase.
 
 ```
 /summon  → creates and validates the plan
@@ -13,7 +13,7 @@ description: "Autonomous plan executor. Reads a multi-stream plan, orchestrates 
 /stream  → executes one stream at a time (manual alternative to /dominion)
 ```
 
-The user chooses: `/dominion` for full autonomy, `/stream` for hands-on control.
+Use `/dominion` for full autonomy and `/stream` for hands-on control.
 
 ## When to Use
 
@@ -46,7 +46,7 @@ Same cascade as `/stream` Phase 1 — check active status files, then recent pla
 
 ### Step 2: Ensure status file exists
 
-Once a plan is resolved, immediately check for its companion `.status.json`. If it exists, load it. If not, create it now:
+Once a plan is resolved, immediately check for its companion `.status.json`. If it exists, load it. If not, create it:
 
 1. Parse all stream headers matching `## Stream N:` or `## Stream N —`
 2. For each stream, extract: name, dependencies, files owned, sub-streams
@@ -55,8 +55,12 @@ Once a plan is resolved, immediately check for its companion `.status.json`. If 
    - Extract **Per-Stream** skill assignments from the table
    - Combine baseline + per-stream into a `baselineSkills` array for each stream
    - If no `## Required Skills` section exists, set `baselineSkills` to `[]` (triggers conditional loading fallback in `/stream` Phase 3)
-4. Write `docs/plans/{slug}.status.json` with all streams set to `pending`, including `baselineSkills` per stream
-5. Auto-inject Final Review stream with dependencies on ALL other stream IDs
+4. Parse the `## Final Validation Mode` section (if present):
+   - `Mode: codex` → final validation uses `codex-validation`
+   - `Mode: review` → final validation uses classic `review`
+   - If absent, default to `review`
+5. Write `docs/plans/{slug}.status.json` with all streams set to `pending`, including `baselineSkills` per stream and the selected `finalValidationMode`
+6. Auto-inject Final Validation stream with dependencies on ALL other stream IDs
 
 ### Step 3: Pre-flight validation
 
@@ -76,7 +80,7 @@ Execution schedule (from parallelization section):
   Phase 1: Stream 1 (Foundation)              — 1 instance
   Phase 2: Streams 2, 3, 4 (parallel)         — 3 instances
   Phase 3: Streams 5, 6 (parallel)            — 2 instances
-  Phase 4: Final Review                       — 1 instance
+  Phase 4: Final Validation                   — 1 instance
 
 Total: 4 phases, max 3 concurrent instances
 Estimated: ~4 stream durations (vs ~7 sequential)
@@ -110,17 +114,17 @@ cd {project_root} && claude -p "/stream {plan_file}" \
   < /dev/null > {log_file} 2>&1 &
 ```
 
-**Key details:**
+Key details:
 - `< /dev/null` — prevents stdin warning
 - `> {log_file}` — captures output for monitoring and debugging
 - `&` — backgrounds the process
 - Log files go to `docs/plans/.dominion-logs/{stream_id}.log`
 
-**Spawn ALL eligible streams in a single Bash command** using `&` for each. Capture each PID with `$!`, then set up background wait commands per stream (see 2.3).
+Spawn ALL eligible streams in a single Bash command using `&` for each. Capture each PID with `$!`, then set up background wait commands per stream.
 
 ### 2.3 Wait for Process Exit
 
-**Wait for process exit, then verify with Read.** Instead of polling the status file in a loop, use a single backgrounded Bash command per stream that waits for the process to exit. This eliminates all polling overhead and requires zero permission prompts after the initial spawn.
+Wait for process exit, then verify with Read. Do not poll the status file in a loop.
 
 For **each spawned stream**, immediately run a background wait command:
 
@@ -187,19 +191,19 @@ When ALL streams in the current phase are `completed`:
 
 ---
 
-## Phase 3: Final Review
+## Phase 3: Final Validation
 
 When all non-final streams are `completed`:
 
-1. Spawn one headless instance for the Final Review stream
+1. Spawn one headless instance for the Final Validation stream
 2. Monitor until complete
-3. The Final Review stream handles: full verification, `/review`, git commit/push, plan+status cleanup
+3. The Final Validation stream handles: full verification, selected validation mode (`codex-validation` or `review`), git commit/push, plan+status cleanup
 
 ---
 
 ## Phase 4: Report Results
 
-After Final Review completes (or if it fails):
+After Final Validation completes (or if it fails):
 
 ### Success
 
@@ -216,9 +220,9 @@ Phase breakdown:
   Phase 1 (Stream 1):        6 min
   Phase 2 (Streams 2,3,4):  12 min (parallel)
   Phase 3 (Streams 5,6):     9 min (parallel)
-  Phase 4 (Final Review):    7 min
+  Phase 4 (Final Validation): 7 min
 
-Plan and status files cleaned up by Final Review.
+Plan and status files cleaned up by Final Validation.
 Logs available at: docs/plans/.dominion-logs/
 ```
 
@@ -229,7 +233,7 @@ Logs available at: docs/plans/.dominion-logs/
 
 Completed: Streams 1, 2, 4 (3/7)
 Failed: Stream 3
-Blocked: Streams 5, 6, Final Review
+Blocked: Streams 5, 6, Final Validation
 
 Status file preserved: docs/plans/2026-03-31-feature-overhaul.status.json
 Logs: docs/plans/.dominion-logs/
@@ -253,7 +257,7 @@ docs/plans/.dominion-logs/
   stream-final.log
 ```
 
-Create this directory at dominion start. These logs contain the full headless Claude output for each stream — invaluable for debugging failures.
+Create this directory at dominion start. These logs are the debugging trail for failed streams.
 
 ### Log rotation
 
@@ -264,7 +268,7 @@ stream-3.log → stream-3.attempt-1.log
 
 ### Cleanup
 
-Logs are NOT deleted by Final Review (unlike the plan and status files). They persist until the user deletes them manually. This is intentional — they're the audit trail.
+Logs are NOT deleted by Final Validation (unlike the plan and status files). They persist until the user deletes them manually. This is intentional — they're the audit trail.
 
 ---
 
@@ -293,7 +297,7 @@ cd {project_root} && claude -p "/stream {plan_file}" \
 
 ### Why NOT `--dangerouslySkipPermissions`
 
-We use `--allowedTools` to whitelist specific tools rather than blanket-skipping permissions. This means if a stream tries something unexpected (like deleting files or running destructive git commands), the headless instance will be blocked rather than silently proceeding. Safer.
+We use `--allowedTools` to whitelist specific tools rather than blanket-skipping permissions. Unexpected destructive actions stay blocked.
 
 ---
 
@@ -315,13 +319,13 @@ We use `--allowedTools` to whitelist specific tools rather than blanket-skipping
   completes → writes completed
 ```
 
-The status file's optimistic concurrency (read → check → write) prevents double-claiming. Two instances reading simultaneously will see different streams as eligible and claim different ones.
+The status file's optimistic concurrency (read → check → write) prevents double-claiming.
 
 ---
 
 ## Resumability
 
-`/dominion` is fully resumable. If the user's terminal closes or dominion is interrupted:
+`/dominion` is fully resumable. If the terminal closes or dominion is interrupted:
 
 1. Status file preserves all progress
 2. Running `/dominion` again reads the status file
@@ -353,7 +357,7 @@ Phase 3 (parallel, after Streams 2-4):
   → Stream 6: Polish — solo
 
 Phase 4 (after all):
-  → Final Review — verification + review + commit
+  → Final Validation — verification + selected validation mode + commit
 
 Commands that would be spawned:
   Phase 1: 1 instance
@@ -368,16 +372,16 @@ Max concurrent: 3
 
 ## Rules
 
-1. **ALWAYS show the execution preview and get user confirmation** before spawning any instances
-2. **ALWAYS use `--allowedTools`** — never `--dangerouslySkipPermissions`
-3. **ALWAYS redirect stdin from `/dev/null`** — prevents stdin warnings
-4. **ALWAYS log output to files** — the audit trail is critical for debugging
-5. **NEVER modify the status file** — only `/stream` instances write to it; dominion only reads
-6. **NEVER spawn more instances than the phase allows** — respect the parallelization schedule
-7. **Wait for process exit, don't poll** — use a single `while ps -p $PID; do sleep 30; done` per stream with `run_in_background: true`. On exit notification, Read the status file once to confirm. Report when streams exit, not on a timer.
-8. **Max 2 retries per stream** — then ask the user
-9. **Trust process exit for completion** — if a process exits but status is still `in_progress`, the stream crashed. Read the log to diagnose. No arbitrary timeout thresholds.
-10. **Logs persist after cleanup** — don't delete them with the plan/status files
+1. **ALWAYS** show the execution preview and get user confirmation before spawning
+2. **ALWAYS** use `--allowedTools`, never `--dangerouslySkipPermissions`
+3. **ALWAYS** redirect stdin from `/dev/null`
+4. **ALWAYS** log output to files
+5. **NEVER** modify the status file
+6. **NEVER** spawn more instances than the phase allows
+7. Wait for process exit, don't poll
+8. Max 2 retries per stream
+9. Trust process exit for completion
+10. Logs persist after cleanup
 
 ## Rationalization Prevention
 

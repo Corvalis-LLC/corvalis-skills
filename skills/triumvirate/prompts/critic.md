@@ -14,7 +14,9 @@ weaknesses, risks, and argue AGAINST this plan (constructively).
    - Check for hidden complexity
 
 2. RESEARCH failure modes:
-   - Use WebSearch to find anti-patterns
+   - Use WebSearch/WebFetch to find anti-patterns
+   - Always research standard industry practices for similar features/applications, then identify where this plan diverges
+   - Prefer mature engineering sources (FAANG-style engineering blogs, Stripe, Shopify, GitHub, Vercel, Cloudflare, official docs)
    - Look for cases where similar approaches failed
    - Find security/performance concerns
 
@@ -34,6 +36,7 @@ weaknesses, risks, and argue AGAINST this plan (constructively).
 1. **[Risk]**: [Explanation with evidence]
    - Severity: [Critical/High/Medium/Low]
    - Evidence: [what you found]
+   - Industry comparison: [what comparable teams tend to do instead]
    - Mitigation: [how to address]
 
 ### Edge Cases Missed

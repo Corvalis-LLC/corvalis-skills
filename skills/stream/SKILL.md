@@ -5,7 +5,7 @@ description: "Multi-stream plan execution coordinator. Tracks stream progress ac
 
 # /stream — Multi-Stream Plan Executor
 
-Coordinates execution of multi-stream implementation plans across Claude Code sessions. Each session claims one stream, loads relevant skills, executes with incremental verification, and marks completion — so the next session automatically knows where to pick up.
+Coordinates multi-stream plan execution across sessions. Each session claims one stream, loads the right skills, executes with verification, and marks completion.
 
 ## When to Use
 
@@ -54,7 +54,7 @@ Coordinates execution of multi-stream implementation plans across Claude Code se
 
 ### Step 2: Ensure status file exists
 
-Once a plan is resolved, immediately check for its companion `.status.json`. If it exists, load it and proceed to Phase 2. If not, create it now:
+Once a plan is resolved, immediately check for its companion `.status.json`. If it exists, load it and proceed. If not, create it now:
 
 1. Parse all stream headers matching `## Stream N:` or `## Stream N —`
 2. For each stream, extract:
@@ -67,9 +67,13 @@ Once a plan is resolved, immediately check for its companion `.status.json`. If 
    - Extract **Per-Stream** skill assignments from the table
    - Combine baseline + per-stream into a `baselineSkills` array for each stream
    - If no `## Required Skills` section exists, set `baselineSkills` to `[]` (triggers conditional loading fallback in Phase 3)
-4. Write `docs/plans/{slug}.status.json` with all streams set to `pending`, including `baselineSkills` per stream
-5. **Auto-inject Final Review stream:** Add a `"final"` stream with dependencies on ALL other stream IDs. This stream handles full verification, code review, git commit/push, and plan cleanup.
-6. Display the dependency graph
+4. Parse the `## Final Validation Mode` section (if present):
+   - `Mode: codex` → final validation uses `codex-validation`
+   - `Mode: review` → final validation uses classic `review`
+   - If absent, default to `review`
+5. Write `docs/plans/{slug}.status.json` with all streams set to `pending`, including `baselineSkills` per stream and the selected `finalValidationMode`
+6. **Auto-inject Final Validation stream:** Add a `"final"` stream with dependencies on ALL other stream IDs. This stream handles full verification, selected validation mode, git commit/push, and plan cleanup.
+7. Display the dependency graph
 
 See `references/status-schema.md` for the full JSON schema.
 
@@ -125,11 +129,11 @@ Once a stream is selected and dependencies are met:
 
 ## Phase 3: Load Skills
 
-**This happens BEFORE any implementation. Non-negotiable.**
+This happens BEFORE any implementation.
 
 ### Baseline skills from status file (preferred path)
 
-If the status file contains a `baselineSkills` array for this stream (populated by `/summon`'s skill gate), load **exactly** those skills plus the always-load set. Do NOT fall back to conditional keyword matching — the skill gate already made the decisions.
+If the status file contains a `baselineSkills` array for this stream, load **exactly** those skills plus the always-load set. Do NOT fall back to keyword matching.
 
 1. Load the always-load set (see below)
 2. Load every skill listed in the stream's `baselineSkills` array
@@ -146,12 +150,14 @@ These load for every stream, regardless of `baselineSkills`:
 - `auto-naming` (naming discipline)
 - `auto-edge-cases` (boundary handling)
 
-### Final Review stream override
+### Final Validation stream override
 
-If the claimed stream is the Final Review (`"final"`), load ONLY:
+If the claimed stream is the Final Validation stream (`"final"`), load ONLY:
 - `auto-workflow`
 - `auto-coding`
-- `review` (for code review)
+- the selected final validation skill:
+  - `codex-validation` when the status/plan mode is `codex`
+  - `review` when the status/plan mode is `review`
 
 Then proceed directly to Phase 4F.
 
@@ -162,7 +168,7 @@ If the stream has a `**Legion:** Yes` annotation in the plan (from `/summon`'s l
 
 ### Conditional loading (fallback only)
 
-**Use this only when the status file has no `baselineSkills` for the stream** — e.g., plans created before the skill gate existed, or plans written manually without `/summon`.
+Use this only when the status file has no `baselineSkills` for the stream.
 
 Analyze the stream section from the plan. Extract all file paths and keywords, then match:
 
@@ -201,7 +207,7 @@ Invoke each skill via the Skill tool. Do this BEFORE reading any implementation 
 
 ## Phase 4: Execute the Stream
 
-**If the claimed stream is the Final Review (`"final"`), skip to Phase 4F below.**
+**If the claimed stream is the Final Validation stream (`"final"`), skip to Phase 4F below.**
 
 **If the stream has `**Legion:** Yes` in the plan, skip to Phase 4L below.**
 
@@ -213,7 +219,7 @@ Before starting, explicitly state which files you WILL and will NOT touch. Respe
 
 ### 4.2 Incremental Verification
 
-Track file edit count. After every **3 file edits** (complex changes) or **5 file edits** (simple changes), run the project's type checker / linter. If it reports errors: **STOP and fix** before editing more files.
+Track file edit count. After every **3 file edits** (complex) or **5 file edits** (simple), run the type checker / linter. If it reports errors: **stop and fix** before editing more files.
 
 **Parallel stream awareness:** Before fixing any error, check whether the erroring file is owned by another `in_progress` stream. If so, **skip it** — that stream is responsible.
 
@@ -240,7 +246,7 @@ After implementing each API endpoint or page, run a quick smoke test against the
 
 ## Phase 4L: Legion Execution Protocol
 
-This phase executes **only** for streams annotated with `**Legion:** Yes` in the plan. You are the **orchestrator** — follow `auto-legion` discipline.
+This phase executes only for streams annotated with `**Legion:** Yes`. You are the **orchestrator** — follow `auto-legion`.
 
 ### 4L.1 Context Gathering
 
@@ -249,11 +255,11 @@ Read ALL files in the stream's scope. Build a mental model of:
 - Existing code patterns in the project
 - Dependencies between tasks in the stream
 
-**This is the only time you read files.** After this, you craft prompts from what you've learned — agents don't re-read what you already know.
+This is the only time you read files. After this, craft prompts from what you learned.
 
 ### 4L.2 Decompose Into Waves
 
-Follow `auto-legion`'s decomposition algorithm. Using the stream's task list and the plan's suggested wave structure (from the legion gate), produce the wave plan:
+Follow `auto-legion`'s decomposition algorithm. Using the stream task list and the suggested wave structure, produce the wave plan:
 
 1. Parse the plan's suggested waves (e.g., `Wave T: 3 agents → Wave I: 3 agents → Wave D: 2 agents`)
 2. Refine based on what you learned in 5L.1 — the plan's suggestion is a starting point, not gospel
@@ -266,7 +272,7 @@ Update the status file with the legion wave structure.
 
 For each wave, in order (T → I → D → R):
 
-**Dispatch:** Craft focused prompts per `auto-legion` and dispatch ALL agents in the wave simultaneously using the Agent tool with `run_in_background: true`. All Agent calls MUST be in a single message for true parallelism.
+**Dispatch:** Craft focused prompts and dispatch ALL agents in the wave simultaneously using the Agent tool with `run_in_background: true`. All Agent calls MUST be in a single message.
 
 **Wait:** Agents complete in background. You are notified when each finishes.
 
@@ -313,9 +319,9 @@ If legion execution cannot complete (2 consecutive wave failures, unresolvable a
 
 ---
 
-## Phase 4F: Final Review Protocol
+## Phase 4F: Final Validation Protocol
 
-This phase executes **only** for the auto-generated Final Review stream (`"final"`).
+This phase executes **only** for the auto-generated Final Validation stream (`"final"`).
 
 ### 4F.1 Full Project Verification — Zero Tolerance Mode
 
@@ -337,11 +343,16 @@ If any check fails OR produces warnings:
 5. **Loop until completely clean** — no errors, no warnings, no skipped tests
 6. Only proceed to 4F.2 when the entire suite is spotless
 
-Helper mode is not optional. The Final Review stream does not complete until the project is clean. This is the quality gate that justifies the entire plan-stream-legion pipeline.
+Helper mode is not optional. The Final Validation stream does not complete until the project is clean.
 
-### 4F.2 Code Review
+### 4F.2 Validation Review
 
-Run `/review` on all uncommitted changes. Fix all **issues** and **suggestions**. Nitpicks are optional.
+Run the selected validation mode on all uncommitted changes:
+
+- **Mode: `codex`** → run `codex-validation`
+- **Mode: `review`** → run `/review`
+
+For `codex-validation`, fix all issues it identifies before commit. For classic `/review`, fix all **issues** and **suggestions**. Nitpicks are optional.
 
 ### 4F.3 Git Commit & Push
 
@@ -368,7 +379,7 @@ When all tasks in the stream are implemented:
 
 ### 5.1 Verification Gate (non-negotiable)
 
-Run ALL of these **project-wide**:
+Run all of these **project-wide**:
 
 | Check | Scope | Must |
 |-------|-------|------|
@@ -405,11 +416,11 @@ If any check fails: report the failure, do NOT mark as completed, keep `status: 
 
 ## Phase 6: Plan Complete
 
-When ALL streams (including Final Review) have `status: "completed"`:
+When ALL streams (including Final Validation) have `status: "completed"`:
 
-If reached via Final Review, the 4F.5 announcement is the primary output.
+If reached via Final Validation, the 4F.5 announcement is the primary output.
 
-If reached because Final Review was skipped, warn the user to run verification, review, commit/push, and cleanup manually.
+If reached because Final Validation was skipped, warn the user to run verification, validation/review, commit/push, and cleanup manually.
 
 ---
 
@@ -431,14 +442,14 @@ Compare stream headers against status file. If mismatched, offer to add new stre
 
 ## Rules
 
-1. **NEVER start implementing before loading relevant skills** (Phase 3)
-2. **NEVER skip incremental verification** — run type checker every 3-5 file edits
-3. **NEVER mark a stream complete without fresh verification evidence**
-4. **NEVER touch files owned by other `in_progress` streams**
-5. **NEVER skip the Final Review stream** — it is auto-injected and mandatory
-6. **ALWAYS read the status file before claiming**
-7. **ALWAYS verify dependencies before starting blocked streams**
-8. **ALWAYS prompt the user to clear context and run `/stream`** after completing a stream
-9. The status file is the **single source of truth** for cross-session state
-10. The plan file is **read-only** — never modify it during implementation
-11. The Final Review stream **deletes both plan and status files** after successful commit/push
+1. **NEVER** start implementing before loading relevant skills
+2. **NEVER** skip incremental verification
+3. **NEVER** mark a stream complete without fresh verification evidence
+4. **NEVER** touch files owned by other `in_progress` streams
+5. **NEVER** skip the Final Validation stream
+6. **ALWAYS** read the status file before claiming
+7. **ALWAYS** verify dependencies before starting blocked streams
+8. **ALWAYS** prompt the user to clear context and run `/stream` after completing a stream
+9. The status file is the **single source of truth**
+10. The plan file is **read-only**
+11. The Final Validation stream deletes both plan and status files after successful commit/push

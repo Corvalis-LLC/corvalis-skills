@@ -1,33 +1,80 @@
 # Corvalis Skills
 
-A Claude Code skill system for automated software development. Corvalis provides a layered execution pipeline — from session bootstrap through autonomous multi-stream orchestration — plus a comprehensive set of coding discipline skills that enforce quality standards across every line Claude writes. Install the skills, run `/summon`, and let the system handle planning, parallelization, and standards enforcement.
+A skill system for automated software development across **Claude Code** and **Codex**. Corvalis is designed around a small set of human entry points, a larger set of mostly automatic discipline skills, and a clean handoff from planning to execution to validation.
 
-## The Execution Stack
+## From Idea To Implementation
 
-```
-  /summon          Session bootstrap — brainstorm, plan, validate
-     │
-     ▼
-  /dominion        Autonomous orchestrator — spawns headless Claude instances
-     │
-     ├──► /stream [A]    ──► legion wave 1 ──► wave 2 ──► ...
-     ├──► /stream [B]    ──► legion wave 1 ──► wave 2 ──► ...
-     │         (parallel if no dependency)
-     ▼
-  /stream [C]      Waits for A & B, then executes
-     │
-     ▼
-  Done             All streams complete, plan verified
-```
+This is the intended default flow.
 
-1. **`/summon`** bootstraps a new session. You choose: plan, no-plan, or talk-it-out. The planning path writes a structured plan to `docs/plans/`, validates it against quality standards, and optionally runs `/triumvirate` for adversarial review.
-2. **`/dominion`** reads the plan and autonomously executes every stream — spawning parallel headless Claude instances where dependencies allow. This is the hands-off mode.
-3. **`/stream`** executes a single stream per session. It loads the relevant skills, enforces verification gates, and marks completion so the next session knows where to pick up. Use this instead of `/dominion` when you want hands-on control.
-4. **Legion** (loaded automatically by `/stream` when annotated) decomposes a stream's work into TDD-phased waves of parallel background agents, each given minimal context for maximum efficiency.
+### 1. Start In Claude Code With `/summon`
+
+Use `/summon` whenever you are starting a new piece of work.
+
+- Choose **Plan** if the work is non-trivial
+- Choose **No plan** if the task is small and you just want to build
+- Choose **Talk about it** if the idea is still fuzzy
+
+If you choose **Plan**, `/summon` will:
+- write the plan to `docs/plans/`
+- run the standards gate against relevant `auto-*` skills
+- optionally run refinement gates like Swarm, Skill Gate, and Triumvirate
+- ask which final validation style the auto-injected last stream should use
+
+### 2. When You Are Happy With The Plan, Open Codex And Run `/verify`
+
+This is the preferred handoff before execution starts.
+
+- If the plan exists **without** a status file yet, Codex `/verify` behaves like a plan-refinement pass
+- It should tighten clarity, catch missing reuse opportunities, improve abstraction sanity, and compress the plan where possible without losing intent
+- This is the best moment to get the “senior sanity check” before streams start creating state
+
+### 3. Go Back To Claude Code And Execute
+
+After the plan looks good:
+
+- Use `/stream` if you want to execute one stream at a time with hands-on control
+- Use `/dominion` if you want Claude Code to execute the full multi-stream plan autonomously
+
+`/stream` and `/dominion` create and use the plan’s companion `.status.json` file. That status file is the boundary between “pre-execution plan refinement” and “in-flight implementation validation.”
+
+### 4. Validate While Work Is In Flight
+
+Once `/stream` or `/dominion` has started and the status file exists, Codex `/verify` changes roles:
+
+- it stops acting like a plan-refinement pass
+- it becomes a findings-first implementation validation pass
+- it checks correctness, cross-file impact, maintainability, testability, and senior-level readability
+
+### 5. Finish Through The Final Validation Stream
+
+Every multi-stream execution path ends with an auto-injected final validation stream.
+
+- If the plan’s final validation mode is `codex`, that final stream uses `codex-validation`
+- If the plan’s final validation mode is `review`, that final stream uses the classic `/review` path
+
+That final stream verifies the completed work, then closes out the plan and status files.
+
+## Primary Entry Points
+
+These are the commands you should actually remember.
+
+### Claude Code
+
+- `/summon` — session bootstrap, planning, standards gate, handoff
+- `/stream` — execute one stream from a plan
+- `/dominion` — execute the full multi-stream plan autonomously
+
+### Codex
+
+- `/verify` — active-plan-aware plan refinement or implementation validation
+
+Everything else should be treated as either:
+- an automatic discipline (`auto-*`)
+- or a specialized supporting workflow used deliberately, not as a primary entry point
 
 ## Installation
 
-### Quick Install (symlink)
+### Claude Code Quick Install (symlink)
 
 Clone this repo and run the install script:
 
@@ -40,7 +87,7 @@ chmod +x install.sh
 
 The script symlinks each skill directory into `~/.claude/skills/`. Existing skills with the same name are backed up to `~/.claude/skills-backup-<timestamp>/`.
 
-### Manual Install
+### Claude Code Manual Install
 
 Copy the `skills/` directory contents to your Claude Code skills directory:
 
@@ -48,33 +95,123 @@ Copy the `skills/` directory contents to your Claude Code skills directory:
 cp -R skills/* ~/.claude/skills/
 ```
 
+### Codex Companion Install
+
+For the recommended Codex companion setup, use the dedicated installer:
+
+```bash
+chmod +x install-codex.sh
+./install-codex.sh
+```
+
+That installer links the recommended Codex-side skills into `~/.codex/skills/`:
+- `verify`
+- `auto-sanity`
+
+It also leaves the optional Codex companion skills available to install manually if you want a richer validation stack.
+
+Codex uses a separate skills directory:
+
+```bash
+mkdir -p ~/.codex/skills
+```
+
+Codex only needs the companion verification-side skills, not the entire Claude orchestration stack. Recommended Codex installs:
+
+- `verify`
+- `auto-sanity`
+
+Optional Codex companion skills:
+
+- `codex-validation`
+- `auto-testability`
+
+Example manual install:
+
+```bash
+mkdir -p ~/.codex/skills/verify ~/.codex/skills/auto-sanity
+cp -R skills/verify/* ~/.codex/skills/verify/
+cp -R skills/auto-sanity/* ~/.codex/skills/auto-sanity/
+```
+
+If you also want the optional Codex companion skills:
+
+```bash
+mkdir -p ~/.codex/skills/codex-validation ~/.codex/skills/auto-testability
+cp -R skills/codex-validation/* ~/.codex/skills/codex-validation/
+cp -R skills/auto-testability/* ~/.codex/skills/auto-testability/
+```
+
+Recommended operating model:
+- Claude Code owns planning and execution: `/summon`, `/stream`, `/dominion`
+- Codex owns the stronger validation lane: `/verify`
+
 ## Quick Start
 
-1. Install the skills (see above)
+### Claude Code flow
+
+1. Install the Claude Code skills (see above)
 2. Start a new Claude Code session
 3. Run `/summon`
 4. Choose **Plan** — describe what you're building
 5. The system writes a plan, validates it, and recommends next steps
-6. Run `/dominion` to execute the full plan autonomously, or `/stream` to execute one stream at a time
+6. When you are happy with the plan, open Codex and run `/verify`
+7. Return to Claude Code and run `/dominion` to execute the full plan autonomously, or `/stream` to execute one stream at a time
+
+### Codex flow
+
+1. Install Codex companion skills into `~/.codex/skills/` using `./install-codex.sh` or the manual steps above
+2. If a plan exists but execution has not started yet, run `/verify` to refine the plan
+3. If implementation is already underway, run `/verify` to perform the stronger findings-first validation pass
+
+## The Execution Stack
+
+```
+  /summon          Session bootstrap — brainstorm, plan, validate
+     │
+     ├──► /verify        Codex plan refinement before execution
+     │
+     ▼
+  /dominion        Autonomous orchestrator — spawns headless Claude instances
+     │
+     ├──► /stream [A]    ──► legion wave 1 ──► wave 2 ──► ...
+     ├──► /stream [B]    ──► legion wave 1 ──► wave 2 ──► ...
+     │         (parallel if no dependency)
+     ▼
+  /stream [C]      Waits for A & B, then executes
+     │
+     ├──► /verify        Codex implementation validation while work is active
+     ▼
+  Done             All streams complete, plan verified
+```
 
 ## Skill Reference
 
-### Workflow & Orchestration
+### Claude Code Entry Points
 
 | Skill | Description |
 |-------|-------------|
 | `summon` | Session bootstrap — offers plan, no-plan, or talk-it-out paths |
 | `dominion` | Autonomous plan executor — spawns headless Claude instances per stream |
 | `stream` | Per-stream executor with dependency tracking and verification gates |
-| `auto-legion` | Parallel agent waves within a stream (T→I→D→R phases) |
-| `auto-workflow` | TDD enforcement, verification before completion, architecture escalation |
-| `triumvirate` | Adversarial plan review with three subagents (Advocate, Analyst, Critic) |
 
-### Tools
+### Codex Entry Points
 
 | Skill | Description |
 |-------|-------------|
+| `verify` | Plan-aware Codex-style verification with findings-first manual review and stronger testability/refactor scrutiny |
+
+### Supporting Workflows
+
+| Skill | Description |
+|-------|-------------|
+| `auto-legion` | Parallel agent waves within a stream (T→I→D→R phases) |
+| `auto-workflow` | TDD enforcement, verification before completion, architecture escalation |
+| `triumvirate` | Adversarial plan review with three subagents (Advocate, Analyst, Critic) |
 | `review` | Code review across 9 dimensions (security, logic, tech debt, etc.) |
+| `codex-validation` | Findings-first final validation with stronger manual audit, cross-file impact checking, and testability/refactor focus |
+| `codex-plan-refinement` | Codex-side plan refinement for clarity, dependency sanity, reuse, abstraction quality, and compression before execution |
+| `plan-validate` | Validate multi-stream plans for structure, dependencies, ownership, required skills, verification, and final validation mode before execution |
 | `design` | UI/UX design system with auditing, generation, and style migration |
 | `skill-creator` | Create, modify, eval, and benchmark skills |
 | `security-scan` | Active vulnerability scanner (dangerous patterns, secrets, npm audit) |
@@ -92,6 +229,8 @@ cp -R skills/* ~/.claude/skills/
 | `auto-logging` | Log level selection, structured fields, what to log vs not |
 | `auto-edge-cases` | Empty collections, zero inputs, off-by-one, overflow, Unicode |
 | `auto-test-quality` | Meaningful assertions, mock boundaries, tautological test detection |
+| `auto-testability` | Extract logic into clean seams so business rules can be tested directly instead of through brittle orchestration |
+| `auto-sanity` | Senior-level readability and maintainability checks for code that works but may be calcifying structurally |
 | `auto-concurrency` | Race conditions, atomicity, lock ordering, TOCTOU bugs |
 | `auto-resource-lifecycle` | Guaranteed cleanup on all paths, RAII/context managers |
 | `auto-resilience` | Timeouts, retries with backoff, circuit breaking, idempotency |
@@ -122,17 +261,17 @@ cp -R skills/* ~/.claude/skills/
 
 The system is organized in three layers:
 
-### Layer 1: `/dominion` — Autonomous Orchestrator
+### Layer 1: Claude Entry Points
 
-Reads a multi-stream plan and executes the entire thing without human intervention. Spawns one headless Claude instance per eligible stream, runs them in parallel where dependencies allow, monitors their status files, and cascades to the next wave when streams complete. Choose `/dominion` when you want to walk away.
+`/summon`, `/stream`, and `/dominion` are the core human entry points in Claude Code.
 
-### Layer 2: `/stream` — Per-Stream Executor
+### Layer 2: Supporting Workflows
 
-Executes a single stream within a plan. Loads the skills relevant to that stream's work, tracks progress in a `.status.json` companion file, enforces verification gates (tests must pass before marking complete), and coordinates with other streams via dependency checks. When a stream is annotated for legion mode, `/stream` loads `auto-legion` to parallelize the work further.
+Supporting workflows such as `triumvirate`, `review`, `codex-validation`, `plan-validate`, and `design` are intentionally fewer and more deliberate. They are not meant to compete with the primary entry points.
 
 ### Layer 3: `auto-*` — Discipline Skills
 
-Auto-triggered coding standards that activate based on what you're doing. Writing a database query? `auto-database` loads. Adding error handling? `auto-errors` activates. These skills encode the patterns Claude knows but inconsistently applies — they make the quality floor consistent.
+Auto-triggered coding standards activate based on what you're doing. Writing a database query? `auto-database` loads. Growing a route into a monolith? `auto-testability` and `auto-sanity` should push extraction and cleanup. These skills encode the patterns the model knows but applies inconsistently, making the quality floor more reliable.
 
 ## Key Concepts
 

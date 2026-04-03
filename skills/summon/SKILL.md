@@ -27,23 +27,19 @@ Then ask the user which path they want:
 
 ### A1. Brainstorm & Write the Plan
 
-Follow the brainstorming and planning workflows from `auto-workflow` and collaborate with the user:
+Follow `auto-workflow`'s planning flow:
 
-1. Ask what they're working on (if not already stated)
-2. Brainstorm the approach collaboratively
-3. Produce a plan using the writing-plans workflow
-4. **Write the plan as a markdown file to `docs/plans/YYYY-MM-DD-<slug>.md`** — this is NON-NEGOTIABLE. The plan MUST be written to this path before proceeding. Do NOT skip this step, do NOT only show the plan in chat. Use the Write tool to save the file.
-5. Get user approval on the plan
+1. Clarify the work
+2. Brainstorm the approach
+3. Produce the plan
+4. **Write it to `docs/plans/YYYY-MM-DD-<slug>.md` before proceeding**
+5. Get user approval
 
-**Keep the plan at the right level of abstraction.** This phase is about *what* to build and *why*. Standards compliance comes next.
-
-**Plan file location is mandatory.** If `docs/plans/` doesn't exist, create it. Every plan goes to `docs/plans/YYYY-MM-DD-<slug>.md` — no exceptions.
+The plan should stay at the *what/why* level. Standards compliance comes next.
 
 ### A2. Standards Gate (NON-NEGOTIABLE)
 
-**This step MUST happen after every plan is written. Never skip it.** Even if the plan seems simple or the user is eager to start implementing. The standards gate catches gaps that cost hours to fix later.
-
-After the plan is written to `docs/plans/` and approved, load the **relevant** auto-* skills and check the plan against them.
+After the plan is written and approved, load the **relevant** auto-* skills and check the plan against them. This is mandatory for every plan.
 
 #### Determine Relevant Skills
 
@@ -65,6 +61,7 @@ Analyze the plan and load only the auto-* skills it touches:
 | `auto-resource-lifecycle` | Files, DB connections, HTTP clients, event listeners, spawned tasks |
 | `auto-concurrency` | Async code, shared state, mutexes, spawned tasks, queues |
 | `auto-test-quality` | Writing or reviewing tests |
+| `auto-testability` | Large orchestrators, repeated validation/business rules, logic that needs cleaner seams for direct tests |
 | `auto-silent-defaults` | Config loading, fallbacks, missing data handling |
 | `auto-hardcoding` | Service URLs, timeouts, pool sizes, magic numbers, credentials |
 | `auto-resilience` | HTTP calls, external APIs, webhooks, partial failure scenarios |
@@ -80,6 +77,25 @@ Analyze the plan and load only the auto-* skills it touches:
 | `auto-i18n` | Multi-locale support, translated strings, pluralization, number/date formatting, RTL |
 
 **Minimum load:** `auto-typescript` applies to virtually every task. `auto-coding`, `auto-errors`, `auto-naming`, and `auto-edge-cases` apply to most implementation work.
+
+#### Applicability Sweep (MANDATORY)
+
+Do a full sweep against the entire auto-* table before finalizing the loaded set. Do not stop at the obvious matches.
+
+For each stream or major plan area, explicitly ask:
+- Is there UI, layout, accessibility, or Svelte work?
+- Is there API, validation, or error-response work?
+- Is there data, migrations, serialization, or schema evolution?
+- Is there async, concurrency, resilience, caching, or job processing?
+- Is there observability, logging, or compliance/security?
+- Is there refactoring or business logic that should trigger `auto-testability`?
+- Is there testing work that needs both `auto-test-quality` and `auto-testability`?
+
+After the first pass, do one more challenge question:
+
+> "What applicable auto-* skill did I probably miss?"
+
+If a skill is not loaded for a plan area where it might apply, state why not.
 
 #### Amend the Plan
 
@@ -116,13 +132,9 @@ Two jobs: (1) **flatten the dependency chain** so streams run in parallel wherev
 
 **Step 1: Dependency Optimization (THE HARD PART)**
 
-Plans naturally drift toward sequential chains: 1 → 2 → 3 → 4 → 5 → 6 → 7. This is almost always over-constrained. A stream should depend on another **only** if it reads or mutates a specific artifact that the other stream produces. "It feels like it comes after" is not a dependency.
+Plans naturally drift toward false sequential chains. A dependency is real only when a stream needs a specific artifact produced by another stream.
 
-**The optimization algorithm:**
-
-**1a. Build the true dependency graph.**
-
-For each stream, identify what it **actually needs from other streams** — not what the author assumed. A dependency is real only when:
+**1a. Build the true dependency graph.** For each stream, identify what it actually needs from other streams. A dependency is real only when:
 
 | Real Dependency | NOT a Real Dependency |
 |----------------|----------------------|
@@ -143,9 +155,7 @@ For each declared dependency, ask: **"What specific file, type, table, or endpoi
 | **Migration batching** | 1(migration) → 2(migration) → 3(code) | 1(both migrations) → {2, 3}(code) | Combine sequential migrations into one stream to unblock others |
 | **Stub unlocking** | 1(service) → 2(frontend uses service) | {1(service), 2(frontend with stub)} | Frontend can build against a type stub while service is implemented |
 
-**1c. Calculate the critical path.**
-
-After optimization, compute the longest dependency chain. This is the minimum number of sequential phases. Report the improvement:
+**1c. Calculate the critical path.** Report the before/after sequential phases:
 
 ```
 Dependency optimization:
@@ -158,15 +168,13 @@ Dependency optimization:
   Improvement: 7 sequential → 3 phases (57% reduction in wall-clock stream time)
 ```
 
-**1d. Restructure the plan if needed.**
-
-If optimization changes dependencies, update the stream headers in the plan file:
+**1d. Restructure the plan if needed.** If optimization changes dependencies, update the stream headers in the plan file:
 - Move the `**Dependencies:**` lines to reflect true dependencies
 - If streams were split (e.g., extracting types into a separate sub-stream), add the new stream header
 - If migrations were combined, merge those stream sections
 - Present changes to the user for approval before writing
 
-**Never silently change stream structure.** Show the before/after dependency graph and explain each change.
+Never silently change stream structure. Show the before/after dependency graph and explain each change.
 
 **Step 2: File Ownership Matrix**
 
@@ -241,18 +249,6 @@ Changes made:
 
 This section is consumed by `/stream` to decide execution mode per stream.
 
-**Rationalization Prevention for Dependencies**
-
-| You're thinking... | Reality |
-|---|---|
-| "Stream 3 obviously needs Stream 2" | Does it import a file Stream 2 creates? Name the file or it's a false dep. |
-| "These should run in order because that's how I'd build it" | Human intuition ≠ machine constraint. Check actual file/type dependencies. |
-| "It's safer to keep them sequential" | Sequential = slower. If the files don't overlap, parallel is both safe AND fast. |
-| "Splitting this stream is too complicated" | A 20-minute split saves hours of sequential waiting. Do the split. |
-| "The user wrote the deps this way" | The user wrote the high-level intent. You optimize the execution. Show your work. |
-
----
-
 #### Skill Gate
 
 Assigns a concrete list of auto-* skills to each stream. Without this gate, `/stream` falls back to heuristic keyword matching — which works but can miss things.
@@ -262,7 +258,7 @@ Assigns a concrete list of auto-* skills to each stream. Without this gate, `/st
 Every stream gets these skills unconditionally:
 
 ```
-auto-workflow, auto-coding, auto-errors, auto-naming, auto-edge-cases
+auto-workflow, auto-coding, auto-errors, auto-naming, auto-edge-cases, auto-testability
 ```
 
 This is the floor. No stream runs without them.
@@ -295,6 +291,10 @@ Present the skill assignments for approval. The user may:
 - Remove skills that don't apply ("Stream 1 doesn't need `auto-evolution`, it's a fresh schema")
 - Move skills between streams
 
+Before writing the section, do one final pass:
+
+> "Which stream is most likely missing an applicable auto-* skill?"
+
 **Step 4: Write to Plan**
 
 Add the `## Required Skills` section to the plan file. This section is consumed by `/stream` during initialization and written into the status file's `baselineSkills` field per stream.
@@ -312,9 +312,39 @@ Skip for: small features, bug fixes, straightforward additions.
 
 ---
 
-### A4. Handoff — Clear Context & Use /stream
+### A4. Final Validation Mode Selection
 
-After the plan is finalized, **recommend clearing context**. The planning session has done its job — it's heavy with brainstorming, standards checking, and potentially triumvirate debate. Implementation sessions should start clean.
+After the optional refinement gates are complete, ask which final validation style the auto-injected last stream should use:
+
+> **Choose the final validation style:**
+> 1. **Codex Validation** — findings-first manual validation, stronger cross-file/testability/refactor audit
+> 2. **Classic Claude Review** — existing `/review`-based final stream
+>
+> Recommended: **Codex Validation** for multi-stream, high-risk, or architectural work. **Classic Claude Review** for smaller or lower-risk plans.
+
+Record the choice in the plan file:
+
+```markdown
+## Final Validation Mode
+Mode: codex
+```
+
+Valid values:
+- `Mode: codex`
+- `Mode: review`
+
+If the user is unsure, recommend `Mode: codex`.
+
+### A5. Handoff — Verify in Codex, Then Execute
+
+After the plan is finalized, **recommend clearing context**. Planning sessions are intentionally heavy; implementation sessions should start clean.
+
+Before any execution session begins, if the user is happy with the plan, explicitly recommend opening **Codex** and running `/verify`.
+
+Frame that recommendation clearly:
+- If the plan has no status file yet, Codex `/verify` will refine the plan for clarity, reuse, abstraction sanity, stream quality, and compression
+- Once `/stream` or `/dominion` starts and a status file exists, Codex `/verify` becomes an implementation-validation pass
+- `/verify` is the last plan-quality checkpoint before execution, not a replacement for `/stream` or `/dominion`
 
 #### For plans with stream headers (`## Stream N:`)
 
@@ -332,7 +362,7 @@ Optimized from 5 sequential streams → 3 phases (40% reduction):
     Stream 4: solo (2 tasks)
   Phase 3: Stream 5 (Integration) — legion (T:2 → I:2 → D:2)
 
-I recommend clearing context now. Two execution options:
+I recommend clearing context now. If you're happy with the plan, open Codex and run `/verify` once before execution. Then choose between two execution options:
 
   /dominion  — autonomous: spawns headless instances, runs all streams
               in parallel where possible, monitors progress, cascades
@@ -345,14 +375,14 @@ Recommendation: /dominion for plans with 3+ streams or parallel phases.
                /stream for small plans or when you want hands-on control.
 ```
 
-This applies to ALL plans with stream headers — even single-stream plans. Cleared context is always a win. The `/stream` skill handles everything: tracking progress, loading relevant skills, managing dependencies, and prompting for the next session.
+This applies to all plans with stream headers, even single-stream plans.
 
 **Key rules:**
 - The plan file is read-only for implementation sessions — they don't modify it
 - `/stream` generates a companion `.status.json` file to track progress across sessions
 - Each stream has file ownership boundaries enforced by `/stream`
 - For parallel-eligible streams, the user can open multiple terminals and run `/stream` in each
-- `/stream` **automatically appends a Final Review stream** that depends on all other streams. This final stream verifies everything, runs `/review`, commits/pushes via `auto-git`, then deletes both the plan and status files. Plan authors do NOT need to include this stream — it's injected automatically.
+- `/stream` **automatically appends a Final Validation stream** that depends on all other streams. Its behavior is selected from the plan's `## Final Validation Mode` section: `codex` loads `codex-validation`, `review` loads the classic `/review` workflow. The final stream verifies everything, runs the selected validation style, commits/pushes, then deletes both the plan and status files. Plan authors do NOT need to include this stream — it's injected automatically.
 
 #### For plans without stream headers
 
@@ -391,7 +421,7 @@ The user isn't sure yet. Help them figure it out:
 
 ## Handling "Skip Planning" From Implementation Sessions
 
-When a user pastes a handoff prompt like "Skip planning — implement the plan at docs/plans/...", this is an implementation session spawned from a planning session. Handle it as:
+When a user pastes a handoff prompt like "Skip planning — implement the plan at docs/plans/...", treat it as an implementation session spawned from planning:
 
 1. Read the plan file
 2. Load all auto-* skills relevant to the assigned section
@@ -402,12 +432,13 @@ When a user pastes a handoff prompt like "Skip planning — implement the plan a
 
 ## Situational Skills (User-Invocable Only)
 
-These are **not auto-loaded** — invoke them manually when needed:
+These are **not auto-loaded**:
 
 | Skill | When to Invoke |
 |-------|---------------|
 | `/design` | UI component building, design audits |
 | `/review` | Code review before committing |
+| `codex-validation` | Stronger findings-first final validation before committing |
 | `/triumvirate` | Adversarial plan review (offered in A3, can also invoke standalone) |
 
 | `/security-scan` | Active vulnerability scanning |
@@ -438,10 +469,20 @@ Optional refinement gates (combine numbers, e.g. "12", "123", "3"):
 Recommended: 123 for large plans, 12 for medium, 0 for simple.
 ```
 
+Then ask:
+
+```
+Choose the final validation style:
+1. Codex Validation — stronger manual audit
+2. Classic Claude Review — existing /review flow
+Recommended: 1 for multi-stream or architectural work.
+```
+
 After finalization:
 
 ```
-Plan finalized. Recommend clearing context and starting [N] implementation session(s).
+Plan finalized. If you're happy with it, open Codex and run /verify once before implementation.
+Then clear context and start [N] implementation session(s).
 [Paste-ready prompts for each session]
 ```
 
@@ -449,20 +490,11 @@ Plan finalized. Recommend clearing context and starting [N] implementation sessi
 
 - **No prompts, no props** — fully automatic after invocation
 - **Always offer the three paths** — plan, no plan, talk about it
-- **Plans MUST be written to `docs/plans/`** — always, with `YYYY-MM-DD-<slug>.md` naming. Use the Write tool. Never only display the plan in chat without saving to file. If `docs/plans/` doesn't exist, create it first.
-- **Standards gate is MANDATORY for all plans** — never skip it, even if it finds no issues, even if the plan seems simple, even if the user is eager to start. Load the relevant auto-* skills and check the plan against them BEFORE proceeding to A3 or A4.
+- **Plans MUST be written to `docs/plans/YYYY-MM-DD-<slug>.md`** before proceeding
+- **Standards gate is mandatory for all plans**
 - **Triumvirate is optional** — offer it, recommend based on complexity, but don't force it
+- **Final validation mode selection is mandatory for multi-stream plans** — record `Mode: codex` or `Mode: review` in the plan before handoff
+- **Recommend Codex `/verify` once the plan is approved** — it is the preferred last refinement pass before `/stream` or `/dominion`
 - **Recommend clearing context after planning** — the planning session's job is done
 - **Multi-session handoffs must have clear file ownership** — prevent merge conflicts
-- **Do NOT auto-load** situational skills (design, review, triumvirate, security-scan, evolve, instinct-*)
-
-## Rationalization Prevention
-
-These are NOT valid reasons to skip the standards gate or plan file:
-| Rationalization | Reality |
-|----------------|---------|
-| "The plan is simple enough" | Simple plans still benefit from standards review |
-| "The user wants to start implementing" | Standards gate takes 2 minutes, saves hours |
-| "I'll check standards during implementation" | Implementation sessions don't have planning context |
-| "I already know what standards apply" | Load and check anyway — you'll miss something |
-| "I'll just show the plan in chat" | Write it to `docs/plans/` — chat doesn't persist across sessions |
+- **Do NOT auto-load** situational skills (design, review, codex-validation, triumvirate, security-scan, evolve, instinct-*)

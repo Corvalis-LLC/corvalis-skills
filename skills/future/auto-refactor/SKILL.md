@@ -13,7 +13,7 @@ Streams optimize for "get it working." They produce correct code that's structur
 
 ## When to Trigger
 
-This skill activates as a dedicated refactoring stream **after all implementation streams complete but before Final Review**. It operates on the full codebase with all dependencies resolved.
+This skill activates as a dedicated refactoring stream **after all implementation streams complete but before Final Validation**. It operates on the full codebase with all dependencies resolved.
 
 It also auto-triggers when you encounter files exceeding the split thresholds during any code review or modification.
 

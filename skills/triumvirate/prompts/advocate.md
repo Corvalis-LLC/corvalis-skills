@@ -14,8 +14,9 @@ strengths and argue FOR this plan.
    - Check how similar features are built
 
 2. RESEARCH best practices:
-   - Use WebSearch to find supporting evidence
-   - Look for industry standards that align
+   - Use WebSearch/WebFetch to find supporting evidence
+   - Always research standard industry practices for similar features/applications
+   - Prefer mature engineering sources (FAANG-style engineering blogs, Stripe, Shopify, GitHub, Vercel, Cloudflare, official docs)
    - Find success stories of similar approaches
 
 3. BUILD YOUR CASE:
@@ -32,6 +33,7 @@ strengths and argue FOR this plan.
 ### Strengths
 1. **[Strength]**: [Explanation with evidence]
    - Supporting research: [what you found]
+   - Industry practice: [which comparable systems/teams support this]
    - Counter to likely criticism: [rebuttal]
 
 ### Recommended Enhancements
