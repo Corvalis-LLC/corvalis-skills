@@ -157,6 +157,12 @@ software under these terms.
 **Use** means anything you do with the software requiring one
 of your licenses.
 
+## Scope
+
+"Software" in this license covers all files in this repository,
+including skill definitions, agent prompts, scripts, templates,
+and configuration.
+
 ---
 
 Copyright (c) 2025-2026 Corvalis LLC
