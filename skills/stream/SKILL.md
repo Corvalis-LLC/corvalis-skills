@@ -102,7 +102,9 @@ When streams show `in_progress`, **assume another Claude session is actively wor
 
 ### Multiple eligible streams
 
-When 2+ streams are eligible, list them and note they can run in parallel terminals. Let the user pick.
+**If the user's prompt specifies a stream** (e.g. "claim stream 3", "execute stream 5", or the prompt ends with "— claim and execute Stream N"): claim that specific stream immediately. Do NOT list options or ask — just claim and execute.
+
+**Otherwise** (no stream specified): List eligible streams and note they can run in parallel terminals. Let the user pick.
 
 ### Dependency Wait
 
@@ -430,7 +432,7 @@ If reached because Final Validation was skipped, warn the user to run verificati
 Assume another session is working on it. Only resume on explicit user request.
 
 ### Parallel-eligible streams
-List them and note parallel terminal capability. The status file prevents double-claiming.
+If the prompt specifies which stream to claim, claim it immediately. Otherwise, list them and let the user pick. The status file prevents double-claiming.
 
 ### Single-stream plan
 Full Phase 1-6 workflow applies. Phase 2 auto-selects the single stream.

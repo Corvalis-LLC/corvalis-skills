@@ -27,10 +27,24 @@ Then ask the user which path they want:
 
 ### A1. Brainstorm & Write the Plan
 
+#### Run Recon (if available)
+
+Before brainstorming, attempt to gather structured codebase context via `corvalis-recon`:
+
+1. **Gate check:** Only proceed if the `CORVALIS_RECON` environment variable is set to `1`. If unset or any other value, skip silently to the brainstorming steps below.
+2. **Binary check:** Look for `~/.claude/bin/corvalis-recon` (macOS/Linux) or `%USERPROFILE%\.claude\bin\corvalis-recon.exe` (Windows). If not found, skip silently.
+3. **Run:** `timeout 30s ~/.claude/bin/corvalis-recon analyze --root <project_root> --format json`
+   - For large codebases (500+ files expected), add `--budget 8000`
+4. **Validate output:** Check that the JSON parses successfully, has a `version` field, and has a non-empty `files` array.
+5. **On success:** Surface a one-line summary to the user: `"Recon: analyzed X files, Y symbols, Z dependencies"` (from the `summary` field). Feed the recon output into the brainstorming steps below — see `recon/instructions.md` for how to interpret each section.
+6. **On ANY failure** (env var not set, binary missing, timeout, crash, invalid JSON, empty files array): emit a single-line stderr warning (`"recon: skipped — <reason>"`) and fall back to organic Glob/Grep/Read exploration. **Zero degradation** — the planning flow continues identically without recon.
+
+#### Brainstorm
+
 Follow `auto-workflow`'s planning flow:
 
 1. Clarify the work
-2. Brainstorm the approach
+2. Brainstorm the approach (informed by recon output when available — use dependency graph for stream boundaries, hotspots for complexity assessment, entry points for architecture understanding)
 3. Produce the plan
 4. **Write it to `docs/plans/YYYY-MM-DD-<slug>.md` before proceeding**
 5. Get user approval

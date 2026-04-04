@@ -2,3 +2,4 @@
 .skill-development/
 .DS_Store
 *.swp
+tools/recon/target/

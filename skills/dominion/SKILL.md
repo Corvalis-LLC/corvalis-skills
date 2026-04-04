@@ -109,12 +109,15 @@ Cross-reference with the execution schedule to determine which streams belong to
 For each eligible stream, spawn a headless Claude instance:
 
 ```bash
-cd {project_root} && claude -p "/stream {plan_file}" \
+cd {project_root} && claude -p "/stream {plan_file} --claim {stream_number}" \
+  --model sonnet \
   --allowedTools "Bash,Read,Write,Edit,Glob,Grep,Skill,Agent" \
   < /dev/null > {log_file} 2>&1 &
 ```
 
 Key details:
+- `--claim {stream_number}` — tells `/stream` exactly which stream to claim, bypassing auto-selection and user prompts. **Critical for headless execution** — without this, `/stream` may prompt for user input when multiple streams are eligible, which hangs the headless process (stdin is `/dev/null`).
+- `--model sonnet` — headless streams run on Sonnet for cost efficiency. Dominion itself runs on Opus for orchestration judgment, but execution streams follow a plan and don't need the strongest model.
 - `< /dev/null` — prevents stdin warning
 - `> {log_file}` — captures output for monitoring and debugging
 - `&` — backgrounds the process
@@ -277,10 +280,19 @@ Logs are NOT deleted by Final Validation (unlike the plan and status files). The
 The exact command spawned for each stream:
 
 ```bash
-cd {project_root} && claude -p "/stream {plan_file}" \
+cd {project_root} && claude -p "/stream {plan_file} --claim {stream_number}" \
+  --model sonnet \
   --allowedTools "Bash,Read,Write,Edit,Glob,Grep,Skill,Agent" \
   < /dev/null > docs/plans/.dominion-logs/stream-{id}.log 2>&1
 ```
+
+### Why `--model sonnet`
+
+Dominion runs on Opus (orchestration requires strong reasoning about phases, failures, and dependency resolution). Streams run on Sonnet — they follow an explicit plan with defined file ownership, loaded skills, and verification gates. The plan does the thinking; the stream does the work.
+
+### Why `--claim {stream_number}`
+
+Without `--claim`, `/stream` auto-selects the lowest-numbered eligible stream. When multiple streams are eligible (common in parallel phases), it prompts the user to pick. Headless instances have no user — stdin is `/dev/null` — so the prompt hangs indefinitely. `--claim` bypasses selection entirely: dominion knows exactly which stream each instance should run, so it tells them directly.
 
 ### Why these allowed tools
 
@@ -373,15 +385,17 @@ Max concurrent: 3
 ## Rules
 
 1. **ALWAYS** show the execution preview and get user confirmation before spawning
-2. **ALWAYS** use `--allowedTools`, never `--dangerouslySkipPermissions`
-3. **ALWAYS** redirect stdin from `/dev/null`
-4. **ALWAYS** log output to files
-5. **NEVER** modify the status file
-6. **NEVER** spawn more instances than the phase allows
-7. Wait for process exit, don't poll
-8. Max 2 retries per stream
-9. Trust process exit for completion
-10. Logs persist after cleanup
+2. **ALWAYS** use `--claim {stream_number}` — headless instances cannot prompt for stream selection
+3. **ALWAYS** use `--model sonnet` — streams execute plans, they don't need Opus
+4. **ALWAYS** use `--allowedTools`, never `--dangerouslySkipPermissions`
+5. **ALWAYS** redirect stdin from `/dev/null`
+6. **ALWAYS** log output to files
+7. **NEVER** modify the status file
+8. **NEVER** spawn more instances than the phase allows
+9. Wait for process exit, don't poll
+10. Max 2 retries per stream
+11. Trust process exit for completion
+12. Logs persist after cleanup
 
 ## Rationalization Prevention
 

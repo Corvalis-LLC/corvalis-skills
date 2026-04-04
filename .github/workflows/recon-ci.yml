@@ -1,0 +1,44 @@
+name: Recon CI
+
+on:
+  push:
+    paths:
+      - "tools/recon/**"
+      - ".github/workflows/recon-ci.yml"
+      - ".github/workflows/recon-release.yml"
+  pull_request:
+    paths:
+      - "tools/recon/**"
+      - ".github/workflows/recon-ci.yml"
+      - ".github/workflows/recon-release.yml"
+
+defaults:
+  run:
+    working-directory: tools/recon
+
+jobs:
+  check:
+    name: Check, Test, Clippy, Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/recon
+
+      - name: Check
+        run: cargo check --all-targets
+
+      - name: Test
+        run: cargo test
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Format
+        run: cargo fmt -- --check
