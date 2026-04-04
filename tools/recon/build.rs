@@ -35,8 +35,7 @@ fn configure_archiver(build: &mut cc::Build) {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn configure_archiver(_build: &mut cc::Build) {
-}
+fn configure_archiver(_build: &mut cc::Build) {}
 
 #[cfg(target_os = "macos")]
 fn write_macos_ar_wrapper() -> std::io::Result<PathBuf> {
