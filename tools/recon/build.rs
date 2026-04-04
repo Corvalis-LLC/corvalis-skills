@@ -1,8 +1,10 @@
-use std::env;
-use std::fs;
 use std::path::PathBuf;
 
-#[cfg(unix)]
+#[cfg(target_os = "macos")]
+use std::env;
+#[cfg(target_os = "macos")]
+use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::PermissionsExt;
 
 fn compile_grammar(name: &str, dir: &str) {
@@ -25,11 +27,15 @@ fn compile_grammar(name: &str, dir: &str) {
     build.compile(name);
 }
 
+#[cfg(target_os = "macos")]
 fn configure_archiver(build: &mut cc::Build) {
-    #[cfg(target_os = "macos")]
     if let Ok(wrapper) = write_macos_ar_wrapper() {
         build.archiver(wrapper);
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn configure_archiver(_build: &mut cc::Build) {
 }
 
 #[cfg(target_os = "macos")]
@@ -57,11 +63,6 @@ exec /usr/bin/ar "$mode" "$@"
     permissions.set_mode(0o755);
     fs::set_permissions(&wrapper, permissions)?;
     Ok(wrapper)
-}
-
-#[cfg(not(target_os = "macos"))]
-fn write_macos_ar_wrapper() -> std::io::Result<PathBuf> {
-    Err(std::io::Error::other("wrapper only needed on macOS"))
 }
 
 fn main() {
