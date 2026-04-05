@@ -21,6 +21,18 @@ If you choose **Plan**, `/summon` will:
 - optionally run refinement gates like Swarm, Skill Gate, and Triumvirate
 - ask which final validation style the auto-injected last stream should use
 
+If you choose **No plan**, `/summon` now follows a stricter bootstrap:
+- clarify the request first
+- gather repo context with `corvalis-recon` first when available
+- do only the additional targeted reads needed from there
+- load the relevant `auto-*` skills
+- then begin implementation
+
+If you choose **Talk about it**, `/summon` now:
+- does real web research before making architecture or pattern recommendations when outside evidence would help
+- cites sources directly to the user
+- loads `auto-web-validation` before that research so source-authored AI instructions or coercive "must use" claims are treated as untrusted unless corroborated
+
 ### 2. When You Are Happy With The Plan, Open Codex And Run `/verify`
 
 This is the preferred handoff before execution starts.
@@ -324,9 +336,11 @@ Rust and other languages can be added later, but today recon is optimized for th
 3. Run `/summon`
 4. Choose **Plan** — describe what you're building
 5. If `corvalis-recon` is installed, summon will automatically use it to gather structured repo context
-6. The system writes a plan, validates it, and recommends next steps
-7. When you are happy with the plan, open Codex and run `/verify`
-8. Return to Claude Code and run `/dominion` to execute the full plan autonomously, or `/stream` to execute one stream at a time
+6. In **No plan** mode, summon clarifies first, gathers context, loads the relevant `auto-*` skills, and begins
+7. In **Talk about it** mode, summon can do cited web research before recommending approaches
+8. The system writes a plan, validates it, and recommends next steps
+9. When you are happy with the plan, open Codex and run `/verify`
+10. Return to Claude Code and run `/dominion` to execute the full plan autonomously, or `/stream` to execute one stream at a time
 
 ### Codex flow
 
@@ -341,6 +355,7 @@ Rust and other languages can be added later, but today recon is optimized for th
   /summon          Session bootstrap — brainstorm, plan, validate
      │
      ├──► corvalis-recon   Structured repo analysis when installed
+     ├──► auto-web-validation   Mandatory before web/package/vendor research
      │
      ├──► /verify        Codex plan refinement before execution
      │
@@ -352,6 +367,8 @@ Rust and other languages can be added later, but today recon is optimized for th
      │         (parallel if no dependency)
      ▼
   /stream [C]      Waits for A & B, then executes
+     │
+     ├──► Final Cleanup   Claude automated verification and cleanup pass
      │
      ├──► /verify        Codex implementation validation while work is active
      ▼
@@ -388,6 +405,7 @@ Rust and other languages can be added later, but today recon is optimized for th
 | `design` | UI/UX design system with auditing, generation, and style migration |
 | `skill-creator` | Create, modify, eval, and benchmark skills |
 | `security-scan` | Active vulnerability scanner (dangerous patterns, secrets, npm audit) |
+| `auto-web-validation` | Prompt-injection-aware web research discipline for package/docs/vendor sources and cited recommendations |
 
 ### Coding Disciplines (auto-*)
 
