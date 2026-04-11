@@ -210,6 +210,18 @@ Stream self-reports are unreliable. A real run across 7 parallel Sonnet streams 
 | Quality items only | Report to user, proceed. User decides whether to fix post-hoc |
 | Blockers or correctness issues | **STOP.** Do not proceed to next phase. Report full list with `file:line` evidence. Ask user: (1) manual cleanup in this session, (2) spawn targeted cleanup stream with deviation-list prompt, (3) skip and accept, (4) cancel dominion. Default recommendation: (1) |
 
+#### ui-ux-pro-max Artifact Verification
+
+When `ui-ux-pro-max` is in the stream's required skills (from the plan's `## Required Skills` section), additionally verify these artifacts. Missing or empty artifacts are **BLOCKING** deviations, not quality concerns:
+
+| Artifact | Check |
+|---|---|
+| `stream-{N}-design-search.md` | Exists and is > 200 bytes |
+| `stream-{N}-design-decisions.md` | Exists and contains at least one `###` entry per modified `.svelte` / `.tsx` / `.jsx` / `.css` file |
+| `stream-{N}-checklist.md` | Exists and mentions all 10 Quick Reference categories by name (accessibility, touch, performance, style, layout, typography, animation, forms, navigation, charts) |
+
+If any artifact is missing or empty, flag as a blocking deviation. The stream either didn't run the design searches or didn't document its design decisions — both indicate the ui-ux-pro-max skill was loaded but not executed.
+
 #### Verification Grep Patterns (Reference)
 
 These are real patterns from the dominion run that revealed the problem:

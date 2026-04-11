@@ -218,9 +218,60 @@ When `ui-ux-pro-max` is in a stream's `baselineSkills` (or matched via condition
 4. **During verification:** Apply the ui-ux-pro-max Quick Reference checklist (accessibility, touch, performance, style, layout, typography, animation, forms, navigation, charts) as an additional verification gate alongside type checking and tests
 5. **If `design-system/MASTER.md` exists:** Read it at stream start and apply its design system rules throughout implementation
 
+### ui-ux-pro-max execution gates (mandatory when loaded)
+
+When `ui-ux-pro-max` is in the stream's required skills, the stream MUST produce three artifact files as proof of execution. These are not optional documentation — they are verification artifacts that `/dominion` Phase 2.3.5 will check. A stream that skips them will be flagged as incomplete and re-spawned or manually cleaned up.
+
+**Artifact A — Pre-implementation design search log**
+
+File: `docs/plans/.dominion-logs/stream-{N}-design-search.md`
+
+Written BEFORE any component code is edited. This is the stream's first action after loading skills.
+
+Contents:
+- The exact search commands run (`python3 skills/ui-ux-pro-max/scripts/search.py ...`)
+- The raw results of each search (paste stdout, don't summarize)
+- One short paragraph per search noting which patterns the stream plans to apply
+- If the stream has a `**Stack:**` annotation, both the domain search AND the stack search must appear
+- If `design-system/MASTER.md` exists in the repo, a note confirming it was read and summarizing the constraints the stream will respect
+- If the stream intentionally skips a search (e.g., no new components, just copy changes), it must say so explicitly with a reason
+
+Empty or missing file = incomplete stream. Not optional.
+
+**Artifact B — Per-change design decisions log**
+
+File: `docs/plans/.dominion-logs/stream-{N}-design-decisions.md`
+
+Written incrementally as the stream edits files. For every non-trivial component / layout / style edit, append one entry:
+
+```
+### <file path>
+- Category: <touch | accessibility | performance | style | layout | typography | animation | forms | navigation | charts>
+- Decision: <one sentence — what the stream did>
+- Rule applied: <cite the ui-ux-pro-max rule name or checklist line>
+```
+
+Small mechanical edits (prop threading, type fixes, import adjustments) don't need an entry. Any edit that affects visual behavior, interaction, accessibility, or layout does.
+
+**Artifact C — Final Quick Reference checklist**
+
+File: `docs/plans/.dominion-logs/stream-{N}-checklist.md`
+
+Written at the end, before the stream marks itself complete. Must enumerate all 10 Quick Reference categories and for each, state either:
+- `Applied: <specific evidence — which files, which checks>`
+- `N/A: <specific reason — why this category didn't apply to this stream>`
+
+The 10 categories: accessibility, touch & interaction, performance, style selection, layout & responsive, typography & color, animation, forms & feedback, navigation patterns, charts & data.
+
+If more than 3 categories are `N/A`, include a top-line note explaining why so little of the skill was relevant. If the answer is "this wasn't really a UI stream," the skill probably shouldn't have been in the required-skills list.
+
+**Completion gate:** A stream with `ui-ux-pro-max` in its required skills CANNOT mark its status as `completed` without all three artifacts existing and being non-empty. Check before the final status-file write in Phase 5.3.
+
 ### Load the skills
 
 Invoke each skill via the Skill tool. Do this BEFORE reading any implementation tasks.
+
+**When `ui-ux-pro-max` is loaded**, the stream's first action after loading all skills (before any code reads or edits) must be to write Artifact A (the design search log). This forces design search to happen upstream of implementation, not after the fact as a rationalization.
 
 Hard rule: if this stream session needs any web research, package/library search, vendor-doc lookup, or source-backed recommendation work, load `auto-web-validation` first before doing that research.
 
@@ -439,6 +490,13 @@ If all remaining errors belong to other active streams, your stream may pass ver
 
 ### 5.3 Mark Complete
 
+**ui-ux-pro-max artifact gate:** If `ui-ux-pro-max` is in this stream's required skills, verify all three artifacts exist and are non-empty before proceeding:
+- `docs/plans/.dominion-logs/stream-{N}-design-search.md` — must exist, > 200 bytes
+- `docs/plans/.dominion-logs/stream-{N}-design-decisions.md` — must exist, at least one entry per modified `.svelte` / `.tsx` / `.jsx` / `.css` file
+- `docs/plans/.dominion-logs/stream-{N}-checklist.md` — must exist, must mention all 10 Quick Reference categories by name
+
+If any artifact is missing or empty, do NOT mark complete. Write the missing artifact(s) first.
+
 Update the status file: set `status: "completed"`, record `completedAt` timestamp and verification results.
 
 ### 5.4 Announce and Prompt Next Session
@@ -491,3 +549,11 @@ Compare stream headers against status file. If mismatched, offer to add new stre
 10. The status file is the **single source of truth**
 11. The plan file is **read-only**
 12. The Final Validation stream deletes both plan and status files after successful commit/push
+13. When `ui-ux-pro-max` is in a stream's required skills, **ALL THREE** design artifacts must exist and be non-empty before the stream can mark `completed`
+
+## Rationalization Prevention
+
+| You're thinking... | Reality |
+|---|---|
+| "I read the ui-ux-pro-max instructions, I don't need to write the search log" | The search log is not documentation — it's proof the search actually ran. Reading the skill into context and running its scripts are two different things. Without the log, the orchestrator assumes the search didn't run. |
+| "None of the categories applied, I can skip the checklist" | Then ui-ux-pro-max shouldn't be in the required-skills list for this stream. If it IS in the list, the checklist must enumerate each category with reasoning. Blank checklist = incomplete stream. |
