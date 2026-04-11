@@ -141,7 +141,25 @@ Review the plan against each loaded skill's standards and call out gaps:
 
 Present amendments as a short list. If the plan already satisfies all relevant standards, say so — don't invent issues.
 
-Update the plan file in `docs/plans/` with the amendments and get user sign-off.
+**Apply amendments as inline edits to the original stream sections** — do NOT append a separate "Standards Amendments" section. Each amendment must directly modify the Sub-tasks, Files, Smoke Test, or other fields in the affected stream's section so that the stream contains ONE authoritative version of its requirements.
+
+Examples of inline amendment application:
+- "This plan adds a form but doesn't mention validation" → add validation sub-tasks directly into the stream's Sub-tasks list
+- "Migration needs to be backwards-compatible" → rewrite the migration sub-task in the stream section to specify backwards compatibility
+- "Use `SameSite=Lax` not `Strict`" → find and replace `Strict` with `Lax` in the stream's Sub-tasks where cookies are mentioned
+- "Add rate limiting to the endpoint" → add a rate-limiting sub-task into the stream that implements the endpoint
+
+After applying inline edits, add a short `## Review Changelog` section **at the top of the plan** (after the summary, before the first stream) listing what changed and why:
+
+```markdown
+## Review Changelog
+
+- Stream 2: added input validation sub-tasks (standards: auto-edge-cases)
+- Stream 4: SameSite changed from Strict to Lax (standards: auto-security — Stripe redirect requires Lax)
+- Stream 1: migration marked as backwards-compatible (standards: auto-evolution)
+```
+
+This gives humans the audit trail without polluting what streams execute. Get user sign-off on the amended plan.
 
 ### A3. Optional Gates
 
@@ -338,7 +356,23 @@ Add the `## Required Skills` section to the plan file. This section is consumed 
 
 #### Triumvirate
 
-Invoke `/triumvirate` which runs three adversarial subagents (Advocate, Analyst, Critic) to stress-test the plan from different angles. Update the plan file with any changes that come out of the debate.
+Invoke `/triumvirate` which runs three adversarial subagents (Advocate, Analyst, Critic) to stress-test the plan from different angles.
+
+**Apply triumvirate findings as inline edits to the original stream sections** — do NOT append a separate "Triumvirate Amendments" section. This is the same inline-mutation rule as the Standards Gate: each finding must directly modify the Sub-tasks, Files, Smoke Test, or other fields in the affected stream's section.
+
+Examples of inline triumvirate application:
+- Triumvirate says "TEST1CENT is physically impossible on Stripe ($0.50 minimum)" → replace every `TEST1CENT` reference in the stream's Sub-tasks, Files, and Smoke Test with `TEST50CENT` (or whatever the correct value is)
+- Triumvirate says "delete DEFAULT_AGE_CUTOFFS outright" → rewrite the Sub-tasks bullet from "rewire to read from config instead of DEFAULT_AGE_CUTOFFS" to "delete DEFAULT_AGE_CUTOFFS; rewire to read from config"
+- Triumvirate says "cap fan-out at 10" → add the cap to the relevant stream's Sub-tasks and Smoke Test
+
+Append triumvirate changes to the existing `## Review Changelog` section (created by the Standards Gate), attributed as `(triumvirate: <reason>)`:
+
+```markdown
+- Stream 7: TEST1CENT → TEST50CENT, added fixed_total_cents discount type (triumvirate: Stripe $0.50 minimum)
+- Stream 3: cookie SameSite changed from Strict to Lax (triumvirate: Stripe redirect requires Lax)
+```
+
+**Why inline, not appended:** A real /dominion run across 7 parallel Sonnet streams demonstrated that every stream read the original Sub-tasks as authoritative and ignored appended amendment sections — including shipping the literal value an amendment called out as "physically impossible." The append pattern is catastrophic and must never be used.
 
 Recommended for: architectural decisions, high-risk changes, large features.
 Skip for: small features, bug fixes, straightforward additions.

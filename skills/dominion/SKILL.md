@@ -171,9 +171,72 @@ Use Option A when the user is watching; Option B when they've walked away.
 [03:56:40] Phase 2 complete — all 3 streams done
 ```
 
+### 2.3.5 Claim Verification (MANDATORY)
+
+**Run this for EVERY stream between process exit and phase transition. Never skip for "trusted" streams — there are no trusted streams.**
+
+Stream self-reports are unreliable. A real run across 7 parallel Sonnet streams produced: every stream reported "completed" with clean tsc/test results, but 6 of 7 had material deviations from the plan's post-review amendments — including Stripe-impossible coupon codes, test files in `src/routes/` that broke SvelteKit, migration number collisions, and silent-fallback patterns the amendments explicitly forbade.
+
+**For each completed stream:**
+
+**a. Read the full stream log** at `docs/plans/.dominion-logs/stream-{N}.log` — not skim, read all of it. Extract every concrete claim the stream made (files touched, decisions taken, values used, tests added).
+
+**b. Extract stream requirements from the plan.** Open the plan file and find that stream's section. Extract every requirement from Sub-tasks, Files, Smoke Test. Since the /summon inline-amendment flow puts all amendments directly into the stream sections, the stream section IS the authoritative requirements list — there is no separate amendments section to cross-reference.
+
+**c. Verify compliance by reading the shipped code.** For each requirement:
+
+| Amendment says... | Verification action |
+|---|---|
+| "Use X not Y" | `grep -rn 'X' src/` (confirm present), `grep -rn 'Y' src/` (confirm absent) |
+| "Delete Z" | `grep -rn 'Z' src/` should return zero hits |
+| Column constraint (NOT NULL, default) | Read the schema/migration file, confirm the constraint |
+| Specific file path or env var | `ls` the path or `grep` for the env var gate |
+| Function signature (takes A, B, C) | Read the function, count parameters |
+| Hardcoded value to remove | `grep -rn 'VALUE' src/ docs/` should return zero hits |
+| Specific test file location | `ls` the directory to verify no misplaced files |
+| Cap/limit (e.g., "fan-out at 10") | Read the handler, confirm the constant and slice/limit |
+
+**d. Build a deviation list.** For each deviation, note:
+- Stream number
+- Requirement (from plan)
+- What the stream actually shipped
+- Severity: **blocker** (breaks production/Stripe/builds), **correctness** (wrong behavior), **quality** (style/naming/minor)
+
+**e. Act on deviations:**
+
+| Deviation list | Action |
+|---|---|
+| Empty | Proceed to phase transition |
+| Quality items only | Report to user, proceed. User decides whether to fix post-hoc |
+| Blockers or correctness issues | **STOP.** Do not proceed to next phase. Report full list with `file:line` evidence. Ask user: (1) manual cleanup in this session, (2) spawn targeted cleanup stream with deviation-list prompt, (3) skip and accept, (4) cancel dominion. Default recommendation: (1) |
+
+#### Verification Grep Patterns (Reference)
+
+These are real patterns from the dominion run that revealed the problem:
+
+```bash
+# Amendment says coupon is TEST50CENT
+grep -rn 'TEST1CENT' src/ docs/         # should return zero hits
+
+# Amendment says column is NOT NULL
+# Read schema file, look for .notNull() on the column
+
+# Amendment says delete DEFAULT_X
+grep -rn 'DEFAULT_X' src/               # should return zero hits
+
+# Amendment says SameSite=Lax
+grep -rn 'sameSite' src/                # confirm value is 'lax'
+
+# Amendment says cap fan-out at 10
+# Read the handler, confirm a constant and a slice
+
+# Stream placed a test file in wrong location
+ls src/routes/                           # verify no .test.ts files with + prefix
+```
+
 ### 2.4 Phase Transition
 
-When ALL streams in the current phase are `completed`:
+When ALL streams in the current phase are `completed` **and have passed claim verification (2.3.5)**:
 
 1. Read the status file one more time to confirm
 2. Check if any new streams are now eligible (deps met)
@@ -203,7 +266,9 @@ When ALL streams in the current phase are `completed`:
 
 ## Phase 3: Final Validation
 
-When all non-final streams are `completed`:
+**Phase 3 is still required even if Phase 2.3.5 found zero deviations.** Claim verification (2.3.5) checks stream-level correctness against plan requirements. Final Validation checks cross-stream integration — the 9-dimension review, full build, commit, push, and cleanup. They are complementary, not redundant.
+
+When all non-final streams are `completed` and verified (2.3.5):
 
 If final validation mode is `review`:
 
@@ -451,6 +516,7 @@ Max concurrent: 3
 12. Logs persist after cleanup
 13. **ALWAYS** load `auto-web-validation` before any web search, package search, or vendor/library research in `/dominion`
 14. In `codex` final validation mode, ALWAYS run the Claude `Final Cleanup` stream first, then stop and hand off to Codex `/verify`
+15. **ALWAYS** run claim verification (Phase 2.3.5) between a stream exiting and the next phase beginning. Never skip this for "trusted" streams — there are no trusted streams
 
 ## Rationalization Prevention
 
@@ -461,3 +527,4 @@ Max concurrent: 3
 | "I should skip the preview for simple plans" | Always preview. The user deserves to see what will be spawned before it happens. |
 | "I'll skip logging to keep it clean" | Logs are the only debugging path when headless instances fail. Never skip. |
 | "This stream is taking too long, I'll kill it" | Trust the process. If it's still running, it's still working. If it exits with failure, you'll be notified. |
+| "The stream reported completed; I should trust it" | Streams trust their own self-reports. Sonnet streams systematically miss post-review amendments and ship work that matches the earlier Sub-tasks text instead. EVERY /dominion run must verify claims against the plan's requirements, not against the stream's report. Run Phase 2.3.5 for every stream, every time. |
