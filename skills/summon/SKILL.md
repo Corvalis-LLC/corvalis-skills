@@ -50,7 +50,8 @@ Before brainstorming, gather structured codebase context via `corvalis-recon` as
 
 1. **Do not start with Glob/Grep/Read if recon is available.** Recon takes priority over organic file discovery for initial context gathering.
 2. **Binary check:** Look for `~/.claude/bin/corvalis-recon` (macOS/Linux) or `%USERPROFILE%\.claude\bin\corvalis-recon.exe` (Windows). The human-facing shell alias `recon` may point to this binary, but summon should verify the binary path directly rather than assuming the alias exists in the current shell.
-3. **Run immediately if present:** `timeout 30s ~/.claude/bin/corvalis-recon analyze --root <project_root> --format json --mode planning`
+3. **Run immediately if present:** `~/.claude/bin/corvalis-recon analyze --root <project_root> --format json --mode planning`
+   - Do NOT wrap with `timeout` — it is not available on macOS and will cause the command to fail
    - For large codebases (500+ files expected), add `--budget 8000`
 4. **Validate output:** Check that the JSON parses successfully, has a `version` field, and has non-empty `planning`, `dependencies`, and `summary` sections.
 5. **On success:** Surface a one-line summary to the user: `"Recon: analyzed X files, Y symbols, Z dependencies"` (from the `summary` field). Feed the recon output into the brainstorming steps below — see `recon/instructions.md` for how to interpret each section.
@@ -472,7 +473,8 @@ The user knows what they want. Get to work:
 1. Clarify the requested work with the user first. If the request is underspecified, ask the minimum substantial question(s) needed to begin safely.
 2. After the user responds, gather context in this exact order:
    - **Binary check first:** Look for `~/.claude/bin/corvalis-recon` (macOS/Linux) or `%USERPROFILE%\.claude\bin\corvalis-recon.exe` (Windows)
-   - **If present, run recon immediately before any other repo exploration:** `timeout 30s ~/.claude/bin/corvalis-recon analyze --root <project_root> --format json --mode planning`
+   - **If present, run recon immediately before any other repo exploration:** `~/.claude/bin/corvalis-recon analyze --root <project_root> --format json --mode planning`
+   - Do NOT wrap with `timeout` — it is not available on macOS and will cause the command to fail
    - For large codebases (500+ files expected), add `--budget 8000`
    - Validate that the output parses and contains `version`, `planning`, `dependencies`, and `summary`
    - Use that recon output as the first-pass context source
