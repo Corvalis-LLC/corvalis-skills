@@ -265,7 +265,7 @@ The 10 categories: accessibility, touch & interaction, performance, style select
 
 If more than 3 categories are `N/A`, include a top-line note explaining why so little of the skill was relevant. If the answer is "this wasn't really a UI stream," the skill probably shouldn't have been in the required-skills list.
 
-**Completion gate:** A stream with `ui-ux-pro-max` in its required skills CANNOT mark its status as `completed` without all three artifacts existing and being non-empty. Check before the final status-file write in Phase 5.3.
+**Completion gate:** A stream with `ui-ux-pro-max` in its required skills CANNOT mark its status as `completed` without all three artifacts existing and being non-empty. Check before the final status-file write in Phase 5.4.
 
 ### Load the skills
 
@@ -292,6 +292,8 @@ Before starting, explicitly state which files you WILL and will NOT touch. Respe
 ### 4.2 Incremental Verification
 
 Track file edit count. After every **3 file edits** (complex) or **5 file edits** (simple), run the type checker / linter. If it reports errors: **stop and fix** before editing more files.
+
+**Run verification commands directly.** Use `pnpm exec vitest run <files>`, NOT `pnpm test <files> | tail -N`. The `| tail -N` pattern hangs indefinitely if any new test file leaves a handle open (a fresh promise, an unreleased timer, a redis reconnect loop). `tail` buffers stdout until EOF; if node never exits, the pipeline never unblocks. This pattern has historically caused `/stream` sessions (especially headless ones) to hang at 0% CPU after shipping all files. Avoid it.
 
 **Parallel stream awareness:** Before fixing any error, check whether the erroring file is owned by another `in_progress` stream. If so, **skip it** — that stream is responsible.
 
@@ -467,7 +469,7 @@ When all tasks in the stream are implemented:
 
 ### 5.1 Verification Gate (non-negotiable)
 
-Run all of these **project-wide**:
+Run all of these **project-wide**. **Use direct commands.** Do NOT pipe `pnpm test` output through `| tail` / `| head` / `| grep` when you need to see the full picture — the pipe hangs if node doesn't exit cleanly. Prefer `pnpm exec vitest run` over `pnpm test`.
 
 | Check | Scope | Must |
 |-------|-------|------|
@@ -488,7 +490,19 @@ If verification surfaces errors **outside your stream's files**:
 
 If all remaining errors belong to other active streams, your stream may pass verification with a note listing the skipped errors.
 
-### 5.3 Mark Complete
+### 5.3 Self-Audit Pass (mandatory)
+
+Before marking the stream complete, walk the files you touched and re-check each declared skill's rules against your diff. You're the cheapest place to catch skill violations — a fresh verification agent (under `/dominion`) or a later reviewer will catch them otherwise, more expensively.
+
+For each declared skill (from the status file's `baselineSkills` for this stream):
+- Re-read the skill's enforceable rules
+- Walk your diff: does anything violate those rules?
+- If a violation is obvious and safe to fix, fix it now
+- If uncertain, note it in the `deferrals` field of your completion return
+
+This is Layer 2 of the four-layer enforcement model (see `dominion` SKILL: Layered Skill Enforcement). Primary shapes design, self-audit catches rough edges, verification catches what self-audit missed, remediation fixes the rest. Skipping self-audit pushes more work onto the later layers.
+
+### 5.4 Mark Complete
 
 **ui-ux-pro-max artifact gate:** If `ui-ux-pro-max` is in this stream's required skills, verify all three artifacts exist and are non-empty before proceeding:
 - `docs/plans/.dominion-logs/stream-{N}-design-search.md` — must exist, > 200 bytes
@@ -497,13 +511,26 @@ If all remaining errors belong to other active streams, your stream may pass ver
 
 If any artifact is missing or empty, do NOT mark complete. Write the missing artifact(s) first.
 
-Update the status file: set `status: "completed"`, record `completedAt` timestamp and verification results.
+Update the status file: set `status: "completed"`, record `completedAt` timestamp, and write a `verification` sub-object summarizing gate results. Include a `deferrals` array if any items are out-of-scope-but-noted for a later stream or the human to decide.
 
-### 5.4 Announce and Prompt Next Session
+```json
+"verification": {
+  "gates": { "check": "pass", "lint": "pass", "tests": "42/42" },
+  "deferrals": [
+    { "item": "Sentry breadcrumbs on rate-limit fallback",
+      "reason": "Sentry not wired at project level yet",
+      "owner_suggested": "Foundation follow-up" }
+  ]
+}
+```
+
+Under `/dominion`, the verification and remediation agents read this sub-object — deferrals feed Input 1 of the remediation wave. Under manual `/stream`, the deferrals are notes for the human running the next session.
+
+### 5.5 Announce and Prompt Next Session
 
 Report verification results, remaining streams and their status, overall progress. Prompt: "Clear context and run /stream to pick up the next stream."
 
-### 5.5 Failed Verification
+### 5.6 Failed Verification
 
 If any check fails: report the failure, do NOT mark as completed, keep `status: "in_progress"`.
 

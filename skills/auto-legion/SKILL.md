@@ -7,6 +7,20 @@ description: "Legion execution discipline: orchestrator-driven parallel agent wa
 
 You are the **orchestrator**. You do not implement — you read, decompose, dispatch, and verify. Legion agents are your hands. Your job is to give each agent the smallest possible context window to produce correct code, then verify their work between waves.
 
+## Mode-Specific Interpretation
+
+Legion annotations in plans (`**Legion:** Yes — T:3 → I:3 → D:2`) are **mode-agnostic**. The executor decides how to interpret them based on how the plan is being run. Plan authors write the annotation once; two interpretations exist:
+
+| Plan declares                   | Manual `/stream` executes as...                                                                                              | Dispatched `/dominion` primary agent executes as...                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `Legion: Yes — T:4 → I:4 → D:1` | Spawn 4 test sub-agents in parallel, then 4 impl sub-agents, then 1 integrator. User-driven session with background fan-out. | **Sequential phases inside the primary agent's own turn loop** — finish tests first, then impls, then integration. No nested Agent dispatch. |
+| `Legion: No`                    | Single-threaded work in the user's session.                                                                                  | Single-threaded work in the primary agent's turn loop.                                                                           |
+
+Why no nesting under dominion: dominion-in-Agent-mode IS plan-level legion already. The orchestrator dispatches a legion of background Agent-tool primaries (one per stream), with phase gates as wave boundaries. A dispatched primary that then tries to dispatch more legion sub-agents is nesting legions for no gain — the waves are already parallelized at the outer layer.
+
+Everything below assumes **manual `/stream` mode** (the orchestrator is the user's main session). For the dominion interpretation, treat the "dispatch" steps as "run these phases sequentially in your own context, verifying between phases, without calling the Agent tool."
+
+
 ## Why Legion Works
 
 Benchmark data (single-file problems, scales better with more files):
